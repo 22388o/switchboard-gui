@@ -2,6 +2,7 @@
  import { invoke } from '@tauri-apps/api/tauri';
  import Transfer from '$lib/Transfer.svelte';
  import Receive from '$lib/Receive.svelte';
+ import Console from '$lib/Console.svelte';
  import { main } from '$lib/stores.js';
 
  let amount;
@@ -27,6 +28,7 @@
         <Receive chain="main" />
     </div>
 </div>
+<Console chain="main" />
 <style>
  .container {
      display: grid;

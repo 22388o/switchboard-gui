@@ -25,15 +25,15 @@
     <h1>{$sidechain.name}</h1>
     <div class="container">
         <div class="item">
-            <p>Withdraw</p>
-            <Transfer bind:amount={withdraw_amount} transfer={() => withdraw(data.sidechain, withdraw_amount)} />
+            <input type="number" bind:value={withdraw_amount} placeholder="Withdrawal amount">
+            <button on:click={() => withdraw(data.sidechain, withdraw_amount)}>Withdraw</button>
         </div>
         <div class="item">
             {$sidechain.refundable / 100000000} BTC refundable
         </div>
         <div class="item">
-            <p>Deposit</p>
-            <Transfer bind:amount={deposit_amount} transfer={() => deposit(data.sidechain, deposit_amount)} />
+            <input type="number" bind:value={deposit_amount} placeholder="Deposit amount">
+            <button on:click={() => deposit(data.sidechain, deposit_amount)}>Deposit</button>
         </div>
     </div>
 </div>

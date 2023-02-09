@@ -2,6 +2,7 @@
  import { invoke } from '@tauri-apps/api/tauri';
  import Transfer from '$lib/Transfer.svelte';
  import Receive from '$lib/Receive.svelte';
+ import Console from '$lib/Console.svelte';
  import { zcash } from '$lib/stores.js';
  const { balance } = $zcash;
 
@@ -28,7 +29,7 @@
         <Receive chain="zcash" />
     </div>
 </div>
-
+<Console chain="zcash" />
 <style>
  .container {
      display: grid;

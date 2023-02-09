@@ -8,7 +8,7 @@ use futures::executor::block_on;
 use serde_json::Value;
 use std::path::PathBuf;
 use switchboard::{
-    api::{Balances, BlockCounts, Chain, Sidechain, SidechainClient},
+    api::{get_message, Balances, BlockCounts, Chain, Sidechain, SidechainClient},
     config::Config,
     launcher::*,
 };
@@ -23,7 +23,7 @@ async fn main_request(
     client
         .main_request(method, params)
         .await
-        .map_err(|err| format!("{:#?}", err))
+        .map_err(|err| get_message(err))
 }
 
 #[tauri::command]
@@ -35,7 +35,19 @@ async fn zcash_request(
     client
         .zcash_request(method, params)
         .await
-        .map_err(|err| format!("{:#?}", err))
+        .map_err(|err| get_message(err))
+}
+
+#[tauri::command]
+async fn ethereum_request(
+    client: tauri::State<'_, SidechainClient>,
+    method: String,
+    params: Option<Vec<Value>>,
+) -> Result<Value, String> {
+    client
+        .ethereum_request(method, params)
+        .await
+        .map_err(|err| get_message(err))
 }
 
 #[tauri::command]
@@ -130,13 +142,32 @@ async fn main() -> Result<()> {
     let sb_dir = home_dir.join(".switchboard");
     let datadir = args.datadir.unwrap_or(sb_dir);
     let config: Config = confy::load_path(datadir.join("config.toml"))?;
+    let mut first_launch = false;
+    if !datadir.join("bin").exists() {
+        let url = args
+            .bin_download_url
+            .unwrap_or("http://localhost:8080/bin.tar.gz".into());
+        download_binaries(&datadir, &url).await?;
+        if config.switchboard.regtest {
+            ethereum_regtest_setup(&datadir).await?;
+        }
+        first_launch = true;
+    }
+    if !home_dir.join(".zcash-params").exists() {
+        zcash_fetch_params(&datadir).await?;
+    }
     let client = SidechainClient::new(&config)?;
-    spawn_daemons(&datadir, &config).await?;
+    let Daemons { mut ethereum, .. } = spawn_daemons(&datadir, &config).await?;
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    if config.switchboard.regtest && first_launch {
+        client.activate_sidechains().await?;
+    }
     let app = tauri::Builder::default()
         .manage(client.clone())
         .invoke_handler(tauri::generate_handler![
-            zcash_request,
             main_request,
+            zcash_request,
+            ethereum_request,
             get_new_address,
             deposit,
             withdraw,
@@ -149,6 +180,10 @@ async fn main() -> Result<()> {
         .expect("error while running tauri application");
     app.run(move |_app_handle, event| match event {
         tauri::RunEvent::Exit => {
+            let mut kill = tokio::process::Command::new("kill")
+                .args(["-s", "INT", &ethereum.id().unwrap().to_string()])
+                .spawn()
+                .unwrap();
             block_on(client.stop()).unwrap();
         }
         _ => {}
@@ -161,4 +196,6 @@ async fn main() -> Result<()> {
 struct Cli {
     #[arg(short, long)]
     datadir: Option<PathBuf>,
+    #[arg(short, long)]
+    bin_download_url: Option<String>,
 }

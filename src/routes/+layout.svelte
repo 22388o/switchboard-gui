@@ -32,7 +32,7 @@
    await invoke("generate", { amount });
  }
 </script>
-<a href="/">Board</a>
+<a href="/">Home</a>
 <slot />
 <div class="mining">
     <h1> Mining </h1>
@@ -44,5 +44,15 @@
      width: 1fr;
      border: solid;
      margin: 2px;
+ }
+ a {
+     border: solid;
+     display: block;
+     margin: 2px;
+     padding: 10px;
+     text-align: center;
+     background-color: #eee;
+     color: #000;
+     text-decoration: none;
  }
 </style>
