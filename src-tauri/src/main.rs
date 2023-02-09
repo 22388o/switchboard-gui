@@ -146,7 +146,7 @@ async fn main() -> Result<()> {
     if !datadir.join("bin").exists() {
         let url = args
             .bin_download_url
-            .unwrap_or("http://localhost:8080/bin.tar.gz".into());
+            .unwrap_or("http://drivechain.info/releases/bin/bin.tar.gz".into());
         download_binaries(&datadir, &url).await?;
         if config.switchboard.regtest {
             ethereum_regtest_setup(&datadir).await?;
