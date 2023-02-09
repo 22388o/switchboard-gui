@@ -1,0 +1,44 @@
+<script>
+ import { invoke } from '@tauri-apps/api/tauri';
+ import Transfer from '$lib/Transfer.svelte';
+ import Receive from '$lib/Receive.svelte';
+ import { zcash } from '$lib/stores.js';
+ const { balance } = $zcash;
+
+ let amount;
+ let address;
+ async function send() {
+     const method = 'sendtoaddress';
+     const params = [address, amount];
+     const response = await invoke('zcash_request', { method, params });
+     console.log(response);
+}
+</script>
+<h1>Zcash</h1>
+<div class="container">
+    <div class="item">
+        <p>Balance: {balance/100000000} BTC</p>
+    </div>
+    <div class="item">
+        <p>Send</p>
+        <Transfer bind:address={address} bind:amount={amount} transfer={send}/>
+    </div>
+    <div class="item">
+        <p>Receive</p>
+        <Receive chain="zcash" />
+    </div>
+</div>
+
+<style>
+ .container {
+     display: grid;
+     grid-template-columns: 1fr 1fr 1fr;
+     grid-auto-rows: 1fr;
+ }
+
+ .item {
+     border: solid;
+     margin: 2px;
+     padding: 10px;
+ }
+</style>
