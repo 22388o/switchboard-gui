@@ -1,26 +1,20 @@
 <script>
  import Console from '$lib/Console.svelte';
+ import { invoke } from '@tauri-apps/api/tauri';
+ import { writeText } from '@tauri-apps/api/clipboard';
  import { ethereum } from '$lib/stores.js';
+ import { onMount } from 'svelte';
+
  const { balance } = $ethereum;
+
+
+ let geth_console;
+ onMount(async () => {
+     geth_console = await invoke('get_geth_console_command');
+ });
+ async function copyToClipboard() {
+     await writeText(geth_console);
+ }
 </script>
 <h1>Ethereum</h1>
-<div class="container">
-    <div class="item">
-        <p>Balance: {balance / 100000000} BTC</p>
-    </div>
-</div>
-<Console chain="ethereum" />
-
-<style>
- .container {
-     display: grid;
-     grid-template-columns: 1fr;
-     grid-auto-rows: 1fr;
- }
-
- .item {
-     border: solid;
-     margin: 2px;
-     padding: 10px;
- }
-</style>
+<p>To open Geth JSRE call <button on:click={copyToClipboard} title="Copy to clipboard">{geth_console}</button> in the terminal.</p>

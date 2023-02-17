@@ -134,11 +134,15 @@ async fn get_new_address(
         .map_err(|err| format!("{:#?}", err))
 }
 
+#[tauri::command]
+fn get_geth_console_command(command: tauri::State<'_, GethConsole>) -> String {
+    command.0.clone()
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Cli::parse();
     let home_dir = dirs::home_dir().unwrap();
-    // let sb_dir = home_dir.join(".switchboard");
     let sb_dir = home_dir.join(".switchboard");
     let datadir = args.datadir.unwrap_or(sb_dir);
     let config: Config = confy::load_path(datadir.join("config.toml"))?;
@@ -157,14 +161,19 @@ async fn main() -> Result<()> {
         zcash_fetch_params(&datadir).await?;
     }
     let client = SidechainClient::new(&config)?;
-    let Daemons { mut ethereum, .. } = spawn_daemons(&datadir, &config).await?;
+    let Daemons { ethereum, .. } = spawn_daemons(&datadir, &config).await?;
     std::thread::sleep(std::time::Duration::from_secs(1));
     if config.switchboard.regtest && first_launch {
         client.activate_sidechains().await?;
     }
+    let ipc_file = datadir.join("data/ethereum/geth.ipc");
+    let geth_bin = datadir.join("bin/geth");
+    let geth_console = format!("{} attach {}", geth_bin.display(), ipc_file.display());
     let app = tauri::Builder::default()
         .manage(client.clone())
+        .manage(GethConsole(geth_console))
         .invoke_handler(tauri::generate_handler![
+            get_geth_console_command,
             main_request,
             zcash_request,
             ethereum_request,
@@ -180,7 +189,7 @@ async fn main() -> Result<()> {
         .expect("error while running tauri application");
     app.run(move |_app_handle, event| match event {
         tauri::RunEvent::Exit => {
-            let mut kill = tokio::process::Command::new("kill")
+            let kill = tokio::process::Command::new("kill")
                 .args(["-s", "INT", &ethereum.id().unwrap().to_string()])
                 .spawn()
                 .unwrap();
@@ -190,6 +199,8 @@ async fn main() -> Result<()> {
     });
     Ok(())
 }
+
+struct GethConsole(String);
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

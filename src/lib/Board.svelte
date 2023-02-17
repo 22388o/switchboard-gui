@@ -1,4 +1,5 @@
 <script>
+ import Amount from '$lib/Amount.svelte';
  import { main, zcash, ethereum } from '$lib/stores.js';
 </script>
 
@@ -7,20 +8,20 @@
         <h1>
             Main
         </h1>
-        <p>Balance: {$main.balance / 100000000} BTC</p>
+        <p>Balance: <Amount value={$main.balance} /> BTC</p>
         <p>Block count: {$main.block_count}</p>
     </a>
     <div class="container">
         {#each [ $zcash, $ethereum ] as sidechain}
             <a class="transfer" href="/transfer/{sidechain.id}">
-                {sidechain.refundable / 100000000} BTC refundable
+                <Amount value={sidechain.refundable } /> BTC refundable
             </a>
             <a class="sidechain" href="/{sidechain.id}">
                 <h1>
                     {sidechain.name}:
                 </h1>
                 <p>
-                    Balance: {sidechain.balance / 100000000} BTC
+                    Balance: <Amount value={sidechain.balance }/> BTC
                 </p>
                 <p>
                     Block count: {sidechain.block_count}

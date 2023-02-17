@@ -3696,6 +3696,7 @@ dependencies = [
 [[package]]
 name = "switchboard"
 version = "0.1.0"
+source = "git+https://github.com/nchashch/switchboard?rev=fd6c7986b0b8de0a360e02a92f01f971fd7a8786#fd6c7986b0b8de0a360e02a92f01f971fd7a8786"
 dependencies = [
  "anyhow",
  "base64 0.13.1",

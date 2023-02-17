@@ -3,6 +3,7 @@
  import Transfer from '$lib/Transfer.svelte';
  import Receive from '$lib/Receive.svelte';
  import Console from '$lib/Console.svelte';
+ import Amount from '$lib/Amount.svelte';
  import { main } from '$lib/stores.js';
 
  let amount;
@@ -17,7 +18,7 @@
 <h1>Main</h1>
 <div class="container">
     <div class="item">
-        <p>Balance: {$main.balance / 100000000} BTC</p>
+        <p>Balance: <Amount value={$main.balance} /> BTC</p>
     </div>
     <div class="item">
         <p>Send</p>
