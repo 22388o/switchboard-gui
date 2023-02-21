@@ -8,20 +8,20 @@
         <h1>
             Main
         </h1>
-        <p>Balance: <Amount value={$main.balance} /> BTC</p>
+        <p>Balance: <Amount value={$main.balance} /></p>
         <p>Block count: {$main.block_count}</p>
     </a>
     <div class="container">
         {#each [ $zcash, $ethereum ] as sidechain}
             <a class="transfer" href="/transfer/{sidechain.id}">
-                <Amount value={sidechain.refundable } /> BTC refundable
+                <Amount value={sidechain.refundable } /> refundable
             </a>
             <a class="sidechain" href="/{sidechain.id}">
                 <h1>
                     {sidechain.name}:
                 </h1>
                 <p>
-                    Balance: <Amount value={sidechain.balance }/> BTC
+                    Balance: <Amount value={sidechain.balance }/>
                 </p>
                 <p>
                     Block count: {sidechain.block_count}

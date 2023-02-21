@@ -18,7 +18,7 @@
 <h1>Main</h1>
 <div class="container">
     <div class="item">
-        <p>Balance: <Amount value={$main.balance} /> BTC</p>
+        <p>Balance: <Amount value={$main.balance} /></p>
     </div>
     <div class="item">
         <p>Send</p>

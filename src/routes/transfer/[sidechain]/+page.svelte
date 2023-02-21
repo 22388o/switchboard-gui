@@ -29,7 +29,7 @@
             <button on:click={() => withdraw(data.sidechain, withdraw_amount)}>Withdraw</button>
         </div>
         <div class="item">
-            {$sidechain.refundable / 100000000} BTC refundable
+            {$sidechain.refundable / 100000000} refundable
         </div>
         <div class="item">
             <input type="number" bind:value={deposit_amount} placeholder="Deposit amount">
