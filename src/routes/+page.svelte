@@ -145,13 +145,13 @@
                 <button on:click={stop_bitassets}>Stop Bitassets Qt</button>
             {/if}
         </li>
-        <li>
-            {#if !zcash_running}
-                <button on:click={launch_zcash}>Launch Zcash Daemon</button>
-            {:else}
-                <button on:click={stop_zcash}>Stop Zcash Daemon</button>
-            {/if}
-        </li>
+        <!-- <li>
+             {#if !zcash_running}
+             <button on:click={launch_zcash}>Launch Zcash Daemon</button>
+             {:else}
+             <button on:click={stop_zcash}>Stop Zcash Daemon</button>
+             {/if}
+             </li> -->
         <li>
             {#if !ethereum_running}
                 <button on:click={launch_ethereum}>Launch Ethereum Daemon</button>
