@@ -1,5 +1,6 @@
 <script>
  import { invoke } from '@tauri-apps/api/tauri';
+ import Amount from '$lib/Amount.svelte';
  import Transfer from '$lib/Transfer.svelte';
  import * as stores from '$lib/stores.js';
 
@@ -9,15 +10,17 @@
  let deposit_amount;
 
  async function withdraw(sidechain, amount) {
-     const fee = 10000;
-     amount *= 100000000;
-     await invoke('withdraw', { sidechain, amount, fee });
+     const fee = 0.0001;
+     const method = 'withdraw';
+     const params = [amount, fee];
+     await invoke(sidechain, { method, params});
  }
 
  async function deposit(sidechain, amount) {
-     const fee = 10000;
-     amount *= 100000000;
-     await invoke('deposit', { sidechain, amount, fee });
+     const fee = 0.0001;
+     const method = 'deposit';
+     const params = [amount, fee];
+     await invoke(sidechain, { method, params });
  }
 </script>
 
@@ -29,7 +32,7 @@
             <button on:click={() => withdraw(data.sidechain, withdraw_amount)}>Withdraw</button>
         </div>
         <div class="item">
-            {$sidechain.refundable / 100000000} refundable
+            <Amount value={$sidechain.refundable} /> refundable
         </div>
         <div class="item">
             <input type="number" bind:value={deposit_amount} placeholder="Deposit amount">

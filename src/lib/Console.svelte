@@ -11,7 +11,7 @@
  async function request(method, params) {
      let response;
      try {
-         response = await invoke(`${chain}_request`, { method, params });
+         response = await invoke(`${chain}`, { method, params });
          response = JSON.stringify(response, null, 2);
      } catch(e) {
          console.log(e);
@@ -64,7 +64,7 @@
 
 </script>
 <div class="console">
-    <h1>Console</h1>
+    <h1>{chain} Console</h1>
     <div bind:this={history_element} class="console-history">
         {#each history as command}
             <div class="console-input-log">
@@ -75,7 +75,7 @@
             </div>
         {/each}
     </div>
-    <input bind:value={command} on:keydown={enter} class="console-input" type="text" autofocus spellcheck="false">
+    <input bind:value={command} on:keydown={enter} class="console-input" type="text" spellcheck="false">
 </div>
 <style>
  .console {

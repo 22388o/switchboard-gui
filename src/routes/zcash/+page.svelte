@@ -1,6 +1,4 @@
 <script>
- import { Zcash } from 'zside-gui';
- import { onMount } from 'svelte';
  import { invoke } from '@tauri-apps/api/tauri';
  import Transfer from '$lib/Transfer.svelte';
  import Receive from '$lib/Receive.svelte';
@@ -15,14 +13,13 @@
  async function send() {
      const method = 'sendtoaddress';
      const params = [address, amount];
-     const response = await invoke('zcash_request', { method, params });
-     console.log(response);
+     const response = await invoke('zcash', { method, params });
 }
 
  async function z_listunspent() {
      const method = 'z_listunspent';
      const params = [];
-     const response = await invoke('zcash_request', { method, params });
+     const response = await invoke('zcash', { method, params });
      const unspent = response.filter(unspent => unspent.amount > 0 && unspent.spendable).sort((a, b) => b.amount - a.amount);
      return unspent;
  }
@@ -30,24 +27,25 @@
  async function listunspent() {
      const method = 'listunspent';
      const params = [];
-     const response = await invoke('zcash_request', { method, params });
+     const response = await invoke('zcash', { method, params });
      const unspent = response.filter(unspent => unspent.amount > 0 && unspent.spendable && !unspent.withdrawal).sort((a, b) => b.amount - a.amount);
      return unspent;
  }
 
  async function update() {
      t_unspent = await listunspent();
-     meltable = t_unspent.map(unspent => unspent.amountZat).reduce((a, b) => a + b);
-     const z_unspent = await z_listunspent();
-     console.log(z_unspent);
-     castable = z_unspent.map(unspent => unspent.amountZat).reduce((a, b) => a + b);
+     meltable = t_unspent.map(unspent => unspent.amountZat).reduce((a, b) => a + b) / 100000000;
+     z_unspent = await z_listunspent();
+     castable = z_unspent.map(unspent => unspent.amountZat).reduce((a, b) => a + b) / 100000000;
  }
 
- onMount(async () => {
-   setInterval(async () => {
-       update();
-   }, 1000);
- });
+ async function melt(taddr) {
+     const method = 'z_shieldcoinbase';
+     const params = [taddr, z_unspent[0].address];
+     console.log(params);
+     const response = await invoke('zcash', { method, params });
+     console.log(response);
+ }
 
  let t_unspent = [];
  let z_unspent = [];
@@ -73,12 +71,15 @@
 <div class="melt_cast">
     <div class="item">
         <p>Available to melt: <Amount value={meltable}/></p>
-        <p>Melting: <Amount value={melting}/></p>
-        <label>
-            Amount to melt:
-        </label>
-        <input type="number" bind:value={cast_amount} placeholder="0.001">
-        <button>Melt</button>
+        <ul>
+            {#each t_unspent as unspent ([unspent.txid, unspent.address])}
+            <li>
+                {unspent.address}
+                <Amount value={unspent.amount} />
+                <button on:click={() => melt(unspent.address)}>Melt</button>
+            </li>
+            {/each}
+        </ul>
     </div>
     <div class="item">
         <p>Available to cast: <Amount value={castable}/></p>
@@ -88,10 +89,17 @@
         </label>
         <input type="number" bind:value={cast_amount} placeholder="0.001">
         <button>Cast</button>
+        <ul>
+            {#each z_unspent as unspent ([unspent.address])}
+                <li>
+                    {unspent.address}
+                    <Amount value={unspent.amount} />
+                </li>
+            {/each}
+        </ul>
     </div>
 </div>
 <Console chain="zcash" />
-<Zcash />
 <style>
  .melt_cast {
      display: grid;

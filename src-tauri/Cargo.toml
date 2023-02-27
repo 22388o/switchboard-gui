@@ -1,7 +1,7 @@
 [package]
 name = "switchboard-gui"
 version = "0.0.0"
-description = "A Tauri App"
+description = "GUI for launching and running BIP300/301 sidechains."
 authors = ["you"]
 license = ""
 repository = ""
@@ -20,16 +20,19 @@ tauri = { version = "1.2", features = ["api-all"] }
 
 tokio = { version = "1.21.2", features = ["rt-multi-thread", "macros"] }
 anyhow = "1.0.65"
-switchboard = { git = "https://github.com/nchashch/switchboard", rev = "fd6c7986b0b8de0a360e02a92f01f971fd7a8786" }
+switchboard = { git = "https://github.com/nchashch/switchboard" }
+ureq-jsonrpc = { git = "https://github.com/nchashch/ureq-jsonrpc" }
+web3 = "0.18.0"
 clap = { version = "4.0.1", features = ["derive"] }
 confy = "0.5.0"
 dirs = "4.0.0"
 futures = { version = "0.3.25", features = ["executor"] }
+thiserror = "1.0.38"
 
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL
-default = [ "custom-protocol" ]
+default = ["custom-protocol"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
-custom-protocol = [ "tauri/custom-protocol" ]
+custom-protocol = ["tauri/custom-protocol"]

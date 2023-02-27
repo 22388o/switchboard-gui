@@ -7,193 +7,264 @@ use clap::Parser;
 use futures::executor::block_on;
 use serde_json::Value;
 use std::path::PathBuf;
-use switchboard::{
-    api::{get_message, Balances, BlockCounts, Chain, Sidechain, SidechainClient},
-    config::Config,
-    launcher::*,
-};
+use switchboard::{config::Config, launcher};
 use tauri::{RunEvent, WindowEvent};
-
-#[tauri::command]
-async fn main_request(
-    client: tauri::State<'_, SidechainClient>,
-    method: String,
-    params: Option<Vec<Value>>,
-) -> Result<Value, String> {
-    client
-        .main_request(method, params)
-        .await
-        .map_err(|err| get_message(err))
-}
-
-#[tauri::command]
-async fn zcash_request(
-    client: tauri::State<'_, SidechainClient>,
-    method: String,
-    params: Option<Vec<Value>>,
-) -> Result<Value, String> {
-    client
-        .zcash_request(method, params)
-        .await
-        .map_err(|err| get_message(err))
-}
-
-#[tauri::command]
-async fn ethereum_request(
-    client: tauri::State<'_, SidechainClient>,
-    method: String,
-    params: Option<Vec<Value>>,
-) -> Result<Value, String> {
-    client
-        .ethereum_request(method, params)
-        .await
-        .map_err(|err| get_message(err))
-}
-
-#[tauri::command]
-async fn generate(
-    client: tauri::State<'_, SidechainClient>,
-    amount: u64,
-) -> Result<String, String> {
-    client
-        .generate(1, amount)
-        .await
-        .map(|hashes| hashes.first().unwrap().to_string())
-        .map_err(|err| format!("{:#?}", err))
-}
-
-#[tauri::command]
-async fn deposit(
-    client: tauri::State<'_, SidechainClient>,
-    sidechain: Sidechain,
-    amount: u64,
-    fee: u64,
-) -> Result<(), String> {
-    client
-        .deposit(sidechain, amount, fee)
-        .await
-        .map_err(|err| format!("{:#?}", err))?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn withdraw(
-    client: tauri::State<'_, SidechainClient>,
-    sidechain: Sidechain,
-    amount: u64,
-    fee: u64,
-) -> Result<(), String> {
-    client
-        .withdraw(sidechain, amount, fee)
-        .await
-        .map_err(|err| format!("{:#?}", err))?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn refund(
-    client: tauri::State<'_, SidechainClient>,
-    sidechain: Sidechain,
-    amount: u64,
-    fee: u64,
-) -> Result<(), String> {
-    client
-        .refund(sidechain, amount, fee)
-        .await
-        .map_err(|err| format!("{:#?}", err))?;
-    Ok(())
-}
-
-#[tauri::command]
-async fn get_balances(client: tauri::State<'_, SidechainClient>) -> Result<Balances, String> {
-    let balances = client
-        .get_balances()
-        .await
-        .map_err(|err| format!("{:#?}", err))?;
-    Ok(balances)
-}
-
-#[tauri::command]
-async fn get_block_counts(
-    client: tauri::State<'_, SidechainClient>,
-) -> Result<BlockCounts, String> {
-    client
-        .get_block_counts()
-        .await
-        .map_err(|err| format!("{:#?}", err))
-}
-
-#[tauri::command]
-async fn get_new_address(
-    client: tauri::State<'_, SidechainClient>,
-    chain: Chain,
-) -> Result<String, String> {
-    client
-        .get_new_address(chain)
-        .await
-        .map_err(|err| format!("{:#?}", err))
-}
+use web3::Transport;
 
 #[tauri::command]
 fn get_geth_console_command(command: tauri::State<'_, GethConsole>) -> String {
     command.0.clone()
 }
 
+struct Main(ureq_jsonrpc::Client);
+struct Testchain(ureq_jsonrpc::Client);
+struct BitAssets(ureq_jsonrpc::Client);
+struct Zcash(ureq_jsonrpc::Client);
+struct Web3(web3::transports::Http);
+
+#[tauri::command]
+async fn spawn_mainchain(
+    datadir: tauri::State<'_, PathBuf>,
+    config: tauri::State<'_, Config>,
+    client: tauri::State<'_, Main>,
+) -> Result<(), String> {
+    let main_datadir = datadir.join("data/main");
+    let first_launch = !main_datadir.exists();
+    let mut main = launcher::spawn_main_qt(&datadir, &config).map_err(|err| format!("{}", err))?;
+    if config.switchboard.regtest && first_launch {
+        while client
+            .0
+            .send_request::<ureq_jsonrpc::Value>("getblockcount", &[])
+            .is_err()
+        {
+            println!("waiting");
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+        println!("activating sidechains");
+        launcher::activate_sidechains(&client.0).map_err(|err| format!("{}", err))?;
+    }
+    main.wait();
+    Ok(())
+}
+
+#[tauri::command]
+async fn spawn_testchain(
+    datadir: tauri::State<'_, PathBuf>,
+    config: tauri::State<'_, Config>,
+) -> Result<(), String> {
+    launcher::spawn_testchain_qt(&datadir, &config)
+        .map_err(|err| format!("{}", err))?
+        .wait();
+    Ok(())
+}
+
+#[tauri::command]
+async fn spawn_bitassets(
+    datadir: tauri::State<'_, PathBuf>,
+    config: tauri::State<'_, Config>,
+) -> Result<(), String> {
+    launcher::spawn_bitassets_qt(&datadir, &config)
+        .map_err(|err| format!("{}", err))?
+        .wait();
+    Ok(())
+}
+
+#[tauri::command]
+async fn spawn_zcash(
+    datadir: tauri::State<'_, PathBuf>,
+    config: tauri::State<'_, Config>,
+) -> Result<(), String> {
+    let home_dir = dirs::home_dir().unwrap();
+    if !home_dir.join(".zcash-params").exists() {
+        tokio::process::Command::new(datadir.join("bin/fetch-params.sh"))
+            .spawn()
+            .map_err(|err| format!("{}", err))?;
+    }
+    launcher::spawn_zcash(&datadir, &config)
+        .map_err(|err| format!("{}", err))?
+        .wait();
+    Ok(())
+}
+
+#[tauri::command]
+async fn spawn_ethereum(
+    datadir: tauri::State<'_, PathBuf>,
+    config: tauri::State<'_, Config>,
+) -> Result<(), String> {
+    if config.switchboard.regtest && !datadir.join("data/ethereum").exists() {
+        launcher::ethereum_regtest_setup(&datadir).map_err(|err| format!("{}", err))?;
+    }
+    let mut ethereum =
+        launcher::spawn_ethereum(&datadir, &config).map_err(|err| format!("{}", err))?;
+    ethereum.wait();
+    Ok(())
+}
+
+#[tauri::command]
+fn kill_ethereum() -> Result<(), String> {
+    println!("killing ethereum process");
+    let pid = std::process::Command::new("pgrep")
+        .args(["--oldest", "geth"])
+        .output()
+        .map_err(|err| format!("{}", err))?;
+    let pid = std::str::from_utf8(&pid.stdout)
+        .map_err(|err| format!("{}", err))?
+        .trim();
+    let pid: u32 = pid.parse().map_err(|err| format!("{}", err))?;
+    std::process::Command::new("kill")
+        .args(["-s", "INT", &pid.to_string()])
+        .spawn()
+        .map_err(|err| format!("{}", err))?
+        .wait()
+        .map_err(|err| format!("{}", err))?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn mainchain(
+    client: tauri::State<'_, Main>,
+    method: &str,
+    params: Vec<ureq_jsonrpc::Value>,
+) -> Result<Value, String> {
+    client
+        .0
+        .send_request(method, &params)
+        .map_err(|err| format!("{}", err))
+}
+
+#[tauri::command]
+async fn testchain(
+    client: tauri::State<'_, Testchain>,
+    method: &str,
+    params: Vec<ureq_jsonrpc::Value>,
+) -> Result<Value, String> {
+    client
+        .0
+        .send_request(method, &params)
+        .map_err(|err| format!("{}", err))
+}
+
+#[tauri::command]
+async fn bitassets(
+    client: tauri::State<'_, BitAssets>,
+    method: &str,
+    params: Vec<ureq_jsonrpc::Value>,
+) -> Result<Value, String> {
+    client
+        .0
+        .send_request(method, &params)
+        .map_err(|err| format!("{}", err))
+}
+
+#[tauri::command]
+async fn zcash(
+    client: tauri::State<'_, Zcash>,
+    method: &str,
+    params: Vec<ureq_jsonrpc::Value>,
+) -> Result<Value, String> {
+    client
+        .0
+        .send_request(method, &params)
+        .map_err(|err| format!("{}", err))
+}
+
+#[tauri::command]
+async fn web3(
+    client: tauri::State<'_, Web3>,
+    method: &str,
+    params: Vec<ureq_jsonrpc::Value>,
+) -> Result<Value, String> {
+    client
+        .0
+        .execute(method, params)
+        .await
+        .map_err(|err| format!("{}", err))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Cli::parse();
-    let home_dir = dirs::home_dir().unwrap();
-    let sb_dir = home_dir.join(".switchboard");
-    let datadir = args.datadir.unwrap_or(sb_dir);
+    let datadir = {
+        let home_dir = dirs::home_dir().unwrap();
+        let sb_dir = home_dir.join(".switchboard");
+        args.datadir.unwrap_or(sb_dir)
+    };
     let config: Config = confy::load_path(datadir.join("config.toml"))?;
-    let mut first_launch = false;
+    let geth_console = {
+        let ipc_file = datadir.join("data/ethereum/geth.ipc");
+        let geth_bin = datadir.join("bin/geth");
+        format!("{} attach {}", geth_bin.display(), ipc_file.display())
+    };
+    let url = args
+        .bin_download_url
+        .unwrap_or("http://drivechain.info/releases/bin/bin-gui.tar.gz".to_string());
     if !datadir.join("bin").exists() {
-        let url = args
-            .bin_download_url
-            .unwrap_or("http://drivechain.info/releases/bin/bin.tar.gz".into());
-        download_binaries(&datadir, &url).await?;
-        if config.switchboard.regtest {
-            ethereum_regtest_setup(&datadir).await?;
-        }
-        first_launch = true;
+        const DIGEST: &str = "2e85f9b54f7ab79780018dda3df670428b4c6289dce6913f383d5c2584a3c48b";
+        launcher::download_binaries(&datadir, &url, DIGEST)?;
     }
-    if !home_dir.join(".zcash-params").exists() {
-        zcash_fetch_params(&datadir).await?;
-    }
-    let client = SidechainClient::new(&config)?;
-    let Daemons { ethereum, .. } = spawn_daemons(&datadir, &config).await?;
-    std::thread::sleep(std::time::Duration::from_secs(1));
-    if config.switchboard.regtest && first_launch {
-        client.activate_sidechains().await?;
-    }
-    let ipc_file = datadir.join("data/ethereum/geth.ipc");
-    let geth_bin = datadir.join("bin/geth");
-    let geth_console = format!("{} attach {}", geth_bin.display(), ipc_file.display());
+    let main_client = ureq_jsonrpc::Client {
+        host: "localhost".to_string(),
+        port: config.main.port,
+        user: config.switchboard.rpcuser.clone(),
+        password: config.switchboard.rpcpassword.clone(),
+        id: "switchboard-gui".to_string(),
+    };
+    let testchain_client = ureq_jsonrpc::Client {
+        host: "localhost".to_string(),
+        port: config.testchain.port,
+        user: config.switchboard.rpcuser.clone(),
+        password: config.switchboard.rpcpassword.clone(),
+        id: "switchboard-gui".to_string(),
+    };
+    let bitassets_client = ureq_jsonrpc::Client {
+        host: "localhost".to_string(),
+        port: config.bitassets.port,
+        user: config.switchboard.rpcuser.clone(),
+        password: config.switchboard.rpcpassword.clone(),
+        id: "switchboard-gui".to_string(),
+    };
+    let zcash_client = ureq_jsonrpc::Client {
+        host: "localhost".to_string(),
+        port: config.zcash.port,
+        user: config.switchboard.rpcuser.clone(),
+        password: config.switchboard.rpcpassword.clone(),
+        id: "switchboard-gui".to_string(),
+    };
+    let web3_client =
+        web3::transports::Http::new(&format!("http://localhost:{}", config.ethereum.port))?;
+    // let mut daemons = Daemons::start(&url, &datadir, &config)?;
     let app = tauri::Builder::default()
-        .manage(client.clone())
+        .manage(config)
+        .manage(datadir)
+        .manage(Main(main_client.clone()))
+        .manage(Testchain(testchain_client.clone()))
+        .manage(BitAssets(bitassets_client.clone()))
+        .manage(Zcash(zcash_client.clone()))
+        .manage(Web3(web3_client))
         .manage(GethConsole(geth_console))
         .invoke_handler(tauri::generate_handler![
+            spawn_mainchain,
+            spawn_testchain,
+            spawn_bitassets,
+            spawn_zcash,
+            spawn_ethereum,
+            kill_ethereum,
             get_geth_console_command,
-            main_request,
-            zcash_request,
-            ethereum_request,
-            get_new_address,
-            deposit,
-            withdraw,
-            refund,
-            generate,
-            get_balances,
-            get_block_counts
+            mainchain,
+            testchain,
+            bitassets,
+            zcash,
+            web3
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application");
     app.run(move |_app_handle, event| match event {
         tauri::RunEvent::Exit => {
-            let kill = tokio::process::Command::new("kill")
-                .args(["-s", "INT", &ethereum.id().unwrap().to_string()])
-                .spawn()
-                .unwrap();
-            block_on(client.stop()).unwrap();
+            kill_ethereum();
+            testchain_client.send_request::<ureq_jsonrpc::Value>("stop", &[]);
+            bitassets_client.send_request::<ureq_jsonrpc::Value>("stop", &[]);
+            zcash_client.send_request::<ureq_jsonrpc::Value>("stop", &[]);
+            main_client.send_request::<ureq_jsonrpc::Value>("stop", &[]);
         }
         _ => {}
     });
@@ -209,4 +280,12 @@ struct Cli {
     datadir: Option<PathBuf>,
     #[arg(short, long)]
     bin_download_url: Option<String>,
+}
+
+#[derive(thiserror::Error, Debug)]
+enum Error {
+    #[error("ureq jsonrpc error")]
+    Ureq(#[from] ureq_jsonrpc::Error),
+    #[error("web3 error")]
+    Web3(#[from] web3::Error),
 }

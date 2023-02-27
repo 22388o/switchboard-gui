@@ -29,7 +29,7 @@
         <Receive chain="main" />
     </div>
 </div>
-<Console chain="main" />
+<Console chain="mainchain" />
 <style>
  .container {
      display: grid;

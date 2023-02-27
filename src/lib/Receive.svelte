@@ -11,7 +11,11 @@
  });
 
  async function newaddress() {
-   address = await invoke("get_new_address", { chain });
+     if (chain === 'main') {
+         address = await invoke('mainchain', { method: 'getnewaddress', params: [] });
+     } else if (chain === 'zcash') {
+         address = await invoke('zcash', { method: 'getnewaddress', params: [] });
+     }
  }
  async function copyToClipboard() {
      await writeText(address);
